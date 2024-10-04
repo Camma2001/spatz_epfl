@@ -31,15 +31,17 @@ float *c;
 int verify_matrix(float *matrix, const float *checksum,
                   const unsigned int num_rows, const unsigned int num_columns) {
   for (unsigned int i = 0; i < num_rows; ++i) {
-    float sum = 0;
+    float sum = 0.0f;
     for (unsigned int j = 0; j < num_columns; ++j) {
-      sum += (float)matrix[i * num_columns + j];
+      sum += matrix[i * num_columns + j];
     }
 
-    float diff = sum - (float)checksum[i];
-    if (diff < 0)
+    float diff = sum - checksum[i];
+    if (diff < 0.0f) {
       diff = -diff;
-    if (diff > 0.001) {
+    }
+
+    if (diff > 0.001f) {
       return i == 0 ? -1 : (int)i;
     }
   }
@@ -132,7 +134,7 @@ int main() {
     long unsigned int performance =
         1000 * 2 * gemm_l.M * gemm_l.N * gemm_l.K / timer;
     long unsigned int utilization =
-        performance / (2 * num_cores * SNRT_NFPU_PER_CORE * 2);
+        performance / (2 * num_cores * SNRT_NFPU_PER_CORE);
 
     printf("\n----- (%dx%d) sp fmatmul -----\n", gemm_l.M, gemm_l.N);
     printf("The execution took %u cycles.\n", timer);

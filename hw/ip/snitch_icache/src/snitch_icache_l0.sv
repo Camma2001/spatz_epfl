@@ -10,7 +10,30 @@
 
 /// A simple single-line cache private to each port.
 module snitch_icache_l0 import snitch_icache_pkg::*; #(
-    parameter config_t CFG = '0,
+    parameter int NR_FETCH_PORTS = 1,
+    parameter int LINE_WIDTH = 1,
+    parameter int LINE_COUNT = 1,
+    parameter int L0_LINE_COUNT = 1,
+    parameter int SET_COUNT = 1,
+    parameter int PENDING_COUNT = 1,
+    parameter int FETCH_AW = 1,
+    parameter int FETCH_DW = 1,
+    parameter int FILL_AW = 1,
+    parameter int FILL_DW = 1,
+    parameter bit EARLY_LATCH = 1,
+    parameter bit BUFFER_LOOKUP = 1,
+    parameter bit GUARANTEE_ORDERING = 1,
+    parameter int FETCH_ALIGN = 1,
+    parameter int FILL_ALIGN = 1,
+    parameter int LINE_ALIGN = 1,
+    parameter int COUNT_ALIGN = 1,
+    parameter int SET_ALIGN = 1,
+    parameter int TAG_WIDTH = 1,
+    parameter int L0_TAG_WIDTH = 1,
+    parameter int L0_EARLY_TAG_WIDTH = 1,
+    parameter int ID_WIDTH_REQ = 1,
+    parameter int ID_WIDTH_RESP = 1,
+    parameter int PENDING_IW = 1,
     parameter int unsigned L0_ID = 0
 ) (
     input  logic clk_i,
@@ -20,48 +43,48 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
     input  logic                      enable_prefetching_i,
     output icache_events_t            icache_events_o,
 
-    input  logic [CFG.FETCH_AW-1:0]   in_addr_i,
+    input  logic [FETCH_AW-1:0]   in_addr_i,
     input  logic                      in_valid_i,
-    output logic [CFG.FETCH_DW-1:0]   in_data_o,
+    output logic [FETCH_DW-1:0]   in_data_o,
     output logic                      in_ready_o,
     output logic                      in_error_o,
 
-    output logic [CFG.FETCH_AW-1:0]      out_req_addr_o,
-    output logic [CFG.ID_WIDTH_REQ-1:0]  out_req_id_o,
+    output logic [FETCH_AW-1:0]      out_req_addr_o,
+    output logic [ID_WIDTH_REQ-1:0]  out_req_id_o,
     output logic                         out_req_valid_o,
     input  logic                         out_req_ready_i,
 
-    input  logic [CFG.LINE_WIDTH-1:0]    out_rsp_data_i,
+    input  logic [LINE_WIDTH-1:0]    out_rsp_data_i,
     input  logic                         out_rsp_error_i,
-    input  logic [CFG.ID_WIDTH_RESP-1:0] out_rsp_id_i,
+    input  logic [ID_WIDTH_RESP-1:0] out_rsp_id_i,
     input  logic                         out_rsp_valid_i,
     output logic                         out_rsp_ready_o
 );
 
-  typedef logic [CFG.FETCH_AW-1:0] addr_t;
+  typedef logic [FETCH_AW-1:0] addr_t;
   typedef struct packed {
-    logic [CFG.L0_TAG_WIDTH-1:0] tag;
+    logic [L0_TAG_WIDTH-1:0] tag;
     logic                        vld;
   } tag_t;
 
-  logic [CFG.L0_TAG_WIDTH-1:0] addr_tag, addr_tag_prefetch;
+  logic [L0_TAG_WIDTH-1:0] addr_tag, addr_tag_prefetch;
 
-  tag_t [CFG.L0_LINE_COUNT-1:0] tag;
-  logic [CFG.L0_LINE_COUNT-1:0][CFG.LINE_WIDTH-1:0] data;
+  tag_t [L0_LINE_COUNT-1:0] tag;
+  logic [L0_LINE_COUNT-1:0][LINE_WIDTH-1:0] data;
 
-  logic [CFG.L0_LINE_COUNT-1:0] hit, hit_early, hit_prefetch;
+  logic [L0_LINE_COUNT-1:0] hit, hit_early, hit_prefetch;
   logic hit_early_is_onehot;
   logic hit_any;
   logic hit_prefetch_any;
   logic miss;
 
-  logic [CFG.L0_LINE_COUNT-1:0] evict_strb;
-  logic [CFG.L0_LINE_COUNT-1:0] flush_strb;
-  logic [CFG.L0_LINE_COUNT-1:0] validate_strb;
+  logic [L0_LINE_COUNT-1:0] evict_strb;
+  logic [L0_LINE_COUNT-1:0] flush_strb;
+  logic [L0_LINE_COUNT-1:0] validate_strb;
 
   typedef struct packed {
     logic vld;
-    logic [CFG.FETCH_AW-1:0] addr;
+    logic [FETCH_AW-1:0] addr;
   } prefetch_req_t;
 
   logic latch_prefetch, last_cycle_was_prefetch_q;
@@ -70,10 +93,10 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
   // split that struct into two distinct signals to avoid multi-driven warnings
   // in Verilator.
   logic prefetch_req_vld_q, prefetch_req_vld_d;
-  logic [CFG.FETCH_AW-1:0] prefetch_req_addr_q, prefetch_req_addr_d;
+  logic [FETCH_AW-1:0] prefetch_req_addr_q, prefetch_req_addr_d;
 
   // Holds the onehot signal for the line being refilled at the moment
-  logic [CFG.L0_LINE_COUNT-1:0] pending_line_refill_q;
+  logic [L0_LINE_COUNT-1:0] pending_line_refill_q;
   logic pending_refill_q, pending_refill_d;
 
   logic evict_req;
@@ -86,7 +109,7 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
 
   typedef struct packed {
     logic                    is_prefetch;
-    logic [CFG.FETCH_AW-1:0] addr;
+    logic [FETCH_AW-1:0] addr;
   } req_t;
 
   req_t refill, prefetch;
@@ -99,22 +122,22 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
 
   assign evict_req = evict_because_miss | evict_because_prefetch;
 
-  assign addr_tag = in_addr_i >> CFG.LINE_ALIGN;
+  assign addr_tag = in_addr_i >> LINE_ALIGN;
 
   // ------------
   // Tag Compare
   // ------------
-  for (genvar i = 0; i < CFG.L0_LINE_COUNT; i++) begin : gen_cmp_fetch
+  for (genvar i = 0; i < L0_LINE_COUNT; i++) begin : gen_cmp_fetch
     assign hit_early[i] = tag[i].vld &
-      (tag[i].tag[CFG.L0_EARLY_TAG_WIDTH-1:0] == addr_tag[CFG.L0_EARLY_TAG_WIDTH-1:0]);
+      (tag[i].tag[L0_EARLY_TAG_WIDTH-1:0] == addr_tag[L0_EARLY_TAG_WIDTH-1:0]);
     // The two signals calculate the same.
-    if (CFG.L0_TAG_WIDTH == CFG.L0_EARLY_TAG_WIDTH) begin : gen_hit_assign
+    if (L0_TAG_WIDTH == L0_EARLY_TAG_WIDTH) begin : gen_hit_assign
       assign hit[i] = hit_early[i];
     // Compare the rest of the tag.
     end else begin : gen_hit
       assign hit[i] = hit_early[i] &
-        (tag[i].tag[CFG.L0_TAG_WIDTH-1:CFG.L0_EARLY_TAG_WIDTH]
-          == addr_tag[CFG.L0_TAG_WIDTH-1:CFG.L0_EARLY_TAG_WIDTH]);
+        (tag[i].tag[L0_TAG_WIDTH-1:L0_EARLY_TAG_WIDTH]
+          == addr_tag[L0_TAG_WIDTH-1:L0_EARLY_TAG_WIDTH]);
     end
     assign hit_prefetch[i] = tag[i].vld & (tag[i].tag == addr_tag_prefetch);
   end
@@ -123,7 +146,7 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
   assign hit_prefetch_any = |hit_prefetch;
   assign miss = ~hit_any & in_valid_i & ~pending_refill_q;
 
-  for (genvar i = 0; i < CFG.L0_LINE_COUNT; i++) begin : gen_array
+  for (genvar i = 0; i < L0_LINE_COUNT; i++) begin : gen_array
     // Tag Array
     always_ff @(posedge clk_i or negedge rst_ni) begin
       if (!rst_ni) begin
@@ -141,7 +164,7 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
         end
       end
     end
-    if (CFG.EARLY_LATCH) begin : gen_latch
+    if (EARLY_LATCH) begin : gen_latch
       // Data Array
       always_latch begin
         if (clk_i && validate_strb[i]) begin
@@ -159,20 +182,20 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
   // we hit in the cache and there was a unique hit.
   assign in_ready_o = hit_any & hit_early_is_onehot;
 
-  logic [CFG.LINE_WIDTH-1:0] ins_data;
+  logic [LINE_WIDTH-1:0] ins_data;
   always_comb begin : data_muxer
     ins_data = '0;
-    for (int unsigned i = 0; i < CFG.L0_LINE_COUNT; i++) begin
-      ins_data |= {CFG.LINE_WIDTH{hit_early[i]}} & data[i];
+    for (int unsigned i = 0; i < L0_LINE_COUNT; i++) begin
+      ins_data |= {LINE_WIDTH{hit_early[i]}} & data[i];
     end
-    in_data_o = ins_data >> (in_addr_i[CFG.LINE_ALIGN-1:CFG.FETCH_ALIGN] * CFG.FETCH_DW);
+    in_data_o = ins_data >> (in_addr_i[LINE_ALIGN-1:FETCH_ALIGN] * FETCH_DW);
   end
 
   // Check whether we had an early multi-hit (e.g., the portion of the tag matched
   // multiple entries in the tag array)
-  if (CFG.L0_TAG_WIDTH != CFG.L0_EARLY_TAG_WIDTH) begin : gen_multihit_detection
+  if (L0_TAG_WIDTH != L0_EARLY_TAG_WIDTH) begin : gen_multihit_detection
     cc_onehot #(
-      .Width (CFG.L0_LINE_COUNT)
+      .Width (L0_LINE_COUNT)
     ) i_onehot_hit_early (
       .d_i (hit_early),
       .is_onehot_o (hit_early_is_onehot)
@@ -184,7 +207,7 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
   // -------
   // Evictor
   // -------
-  logic [$clog2(CFG.L0_LINE_COUNT)-1:0] cnt_d, cnt_q;
+  logic [$clog2(L0_LINE_COUNT)-1:0] cnt_d, cnt_q;
 
   always_comb begin : evictor
     evict_strb = '0;
@@ -218,7 +241,7 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
   // -------------
   // Miss Handling
   // -------------
-  assign refill.addr = addr_tag << CFG.LINE_ALIGN;
+  assign refill.addr = addr_tag << LINE_ALIGN;
   assign refill.is_prefetch = 1'b0;
   assign refill_valid = miss;
 
@@ -275,12 +298,12 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
                               hit_any & ~hit_prefetch_any &
                               hit_early_is_onehot & ~pending_refill_q;
 
-  localparam int unsigned FetchPkts = CFG.LINE_WIDTH/32;
+  localparam int unsigned FetchPkts = LINE_WIDTH/32;
   logic [FetchPkts-1:0] is_branch_taken;
   logic [FetchPkts-1:0] is_jal;
   logic [FetchPkts-1:0] mask;
   // make sure that we only look at the packets which are of interest to
-  assign mask = '1 << in_addr_i[CFG.LINE_ALIGN-1:2];
+  assign mask = '1 << in_addr_i[LINE_ALIGN-1:2];
 
   // Instruction aware pre-fetching
   for (genvar i = 0; i < FetchPkts; i++) begin : gen_pre_decode
@@ -313,7 +336,7 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
 
   logic [$clog2(FetchPkts)-1:0] taken_idx;
   logic no_prefetch;
-  logic [$clog2(CFG.LINE_WIDTH)-1:0] ins_idx;
+  logic [$clog2(LINE_WIDTH)-1:0] ins_idx;
   assign ins_idx = 32*taken_idx;
   // Find first taken branch
   lzc #(
@@ -327,7 +350,7 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
   );
 
   addr_t base_addr, offset, uj_imm, sb_imm;
-  logic [CFG.LINE_ALIGN-1:0] base_offset;
+  logic [LINE_ALIGN-1:0] base_offset;
   assign base_offset = taken_idx << 2;
   assign uj_imm =
     $signed({ins_data[ins_idx+31], ins_data[ins_idx+12+:8],
@@ -339,8 +362,8 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
   // next address calculation
   always_comb begin
     // default is next line predictor
-    base_addr = no_prefetch ? in_addr_i : {in_addr_i >> CFG.LINE_ALIGN, base_offset};
-    offset = (1 << CFG.LINE_ALIGN);
+    base_addr = no_prefetch ? in_addr_i : {in_addr_i >> LINE_ALIGN, base_offset};
+    offset = (1 << LINE_ALIGN);
     // If the cache-line contains a taken branch, compute the pre-fetch address with the jump's offset.
     unique case ({is_branch_taken[taken_idx] & ~no_prefetch, is_jal[taken_idx] & ~no_prefetch})
       // JAL: UJ Immediate
@@ -351,10 +374,10 @@ module snitch_icache_l0 import snitch_icache_pkg::*; #(
     endcase
   end
 
-  assign prefetcher_out.addr = ($signed(base_addr) + offset) >> CFG.LINE_ALIGN << CFG.LINE_ALIGN;
+  assign prefetcher_out.addr = ($signed(base_addr) + offset) >> LINE_ALIGN << LINE_ALIGN;
 
   // check whether cache-line we want to pre-fetch is already present
-  assign addr_tag_prefetch = prefetcher_out.addr >> CFG.LINE_ALIGN;
+  assign addr_tag_prefetch = prefetcher_out.addr >> LINE_ALIGN;
 
   assign latch_prefetch = prefetcher_out.vld & ~prefetch_req_vld_q;
 

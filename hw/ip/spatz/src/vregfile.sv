@@ -99,6 +99,7 @@ module vregfile import spatz_pkg::*; #(
       );
 
       always_latch begin
+      // always_ff @(posedge clk_i, negedge rst_ni) begin
         if (!rst_ni)
           mem[vreg][b] <= '0;
         else

@@ -472,6 +472,48 @@ module spatz_cc
   assign core_events_o.issue_core_to_fpu = '0;
   assign core_events_o.issue_fpu_seq     = '0;
 
+
+// // pragma translate_off
+  logic [NumMemPortsPerSpatz+1:0][31:0] tcdm_counter_q;
+  logic [NumMemPortsPerSpatz+1:0]       tcdm_en       ;
+  logic                                 valid_window_q;
+genvar ii;  
+  generate
+    for(ii=0; ii < NumMemPortsPerSpatz+2 ;ii++) begin
+
+      assign tcdm_en[ii] = (ii >  NumMemPortsPerSpatz) ? valid_window_q & ~hive_rsp_i.inst_ready :
+                           (ii == NumMemPortsPerSpatz) ? valid_window_q & fp_lsu_mem_req.p_ready & fp_lsu_mem_rsp.p_valid
+                                                       : valid_window_q & tcdm_req_o[ii].q_valid & tcdm_rsp_i[ii].q_ready;
+      
+      delta_counter #(
+        .WIDTH(32)
+      ) i_delta_counter_mem (
+        .clk_i     (clk_i                  ),
+        .rst_ni    (rst_ni                 ),
+        .clear_i   (1'b0                   ),
+        .en_i      (tcdm_en[ii]            ),
+        .load_i    (1'b0                   ),
+        .down_i    (1'b0                   ), // We always count up
+        .delta_i   (1                      ),
+        .d_i       (32'b0                  ),
+        .q_o       (tcdm_counter_q[ii]     ),
+        .overflow_o(/* Unused */           )
+      );
+    end
+  endgenerate
+
+  always_ff @(posedge clk_i, negedge rst_ni) begin
+    if(!rst_ni) begin
+      valid_window_q <= 1'b0;
+    end else begin
+      if(hive_rsp_i.inst_data == 32'hb0002573) begin
+        valid_window_q <= ~valid_window_q;
+      end
+    end
+  end
+// // pragma translate_on
+
+
   // --------------------------
   // Tracer
   // --------------------------

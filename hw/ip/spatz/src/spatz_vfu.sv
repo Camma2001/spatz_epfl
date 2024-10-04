@@ -54,6 +54,7 @@ module spatz_vfu
 
     // Encodes both the scalar RD and the VD address in the VRF
     vrf_addr_t vd_addr;
+    logic scalar_MSB;
     logic wb;
     logic last;
 
@@ -272,7 +273,8 @@ module spatz_vfu
     // An instruction finished execution
     if ((result_tag.last && &(result_valid | ~pending_results) && reduction_state_q inside {Reduction_NormalExecution, Reduction_Wait}) || reduction_done) begin
       vfu_rsp_o.id      = result_tag.id;
-      vfu_rsp_o.rd      = result_tag.vd_addr[GPRWidth-1:0];
+      //vfu_rsp_o.rd      = result_tag.vd_addr[GPRWidth-1:0];
+      vfu_rsp_o.rd      = (NrWordsPerVector > 1) ? result_tag.vd_addr[GPRWidth-1:0] : {result_tag.scalar_MSB,result_tag.vd_addr};
       vfu_rsp_o.wb      = result_tag.wb;
       vfu_rsp_o.result  = scalar_result;
       vfu_rsp_valid_o   = 1'b1;
@@ -412,14 +414,8 @@ module spatz_vfu
             reduction_d[1] = $unsigned(vrf_rdata_i[1][32*reduction_pointer_q[idx_width(N_FU*ELENB)-3:0] +: 32]);
           end
           default: begin
-          `ifdef MEMPOOL_SPATZ
-            reduction_d = '0;
-          `else
-            if (MAXEW == EW_64) begin
-              reduction_d[0] = $unsigned(vrf_rdata_i[0][63:0]);
-              reduction_d[1] = $unsigned(vrf_rdata_i[1][64*reduction_pointer_q[idx_width(N_FU*ELENB)-4:0] +: 64]);
-            end
-          `endif
+            if (MAXEW == EW_64) reduction_d[0] = $unsigned(vrf_rdata_i[0][63:0]);
+            if (MAXEW == EW_64) reduction_d[1] = $unsigned(vrf_rdata_i[1][64*reduction_pointer_q[idx_width(N_FU*ELENB)-4:0] +: 64]);
           end
         endcase
         // verilator lint_on SELRANGE
@@ -455,14 +451,8 @@ module spatz_vfu
             reduction_d[1] = $unsigned(vrf_rdata_i[1][32*reduction_pointer_q[idx_width(N_FU*ELENB)-3:0] +: 32]);
           end
           default: begin
-          `ifdef MEMPOOL_SPATZ
-            reduction_d = '0;
-          `else
-            if (MAXEW == EW_64) begin
-              reduction_d[0] = $unsigned(result[63:0]);
-              reduction_d[1] = $unsigned(vrf_rdata_i[1][64*reduction_pointer_q[idx_width(N_FU*ELENB)-4:0] +: 64]);
-            end
-          `endif
+            if (MAXEW == EW_64) reduction_d[0] = $unsigned(result[63:0]);
+            if (MAXEW == EW_64) reduction_d[1] = $unsigned(vrf_rdata_i[1][64*reduction_pointer_q[idx_width(N_FU*ELENB)-4:0] +: 64]);
           end
         endcase
         // verilator lint_on SELRANGE
@@ -539,6 +529,7 @@ module spatz_vfu
       vsew           : spatz_req.vtype.vsew,
       vstart         : spatz_req.vstart,
       vd_addr        : spatz_req.op_arith.is_scalar ? vrf_addr_t'(spatz_req.rd) : vreg_addr_q[2],
+      scalar_MSB     : spatz_req.op_arith.is_scalar & spatz_req.rd[GPRWidth-1],
       wb             : spatz_req.op_arith.is_scalar,
       last           : last_request,
       narrowing      : spatz_req.op_arith.is_narrowing,

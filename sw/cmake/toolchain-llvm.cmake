@@ -25,6 +25,7 @@ add_compile_options(-menable-experimental-extensions)
 add_compile_options(-mno-relax)
 # Set the ISA and ABI
 add_compile_options(-march=rv32imafdvzfh_xdma_xfquarter -mabi=ilp32d)
+# add_compile_options(-march=rv32imafvzfh_xdma -mabi=ilp32)
 # Set the GCC path
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --gcc-toolchain=${GCC_PATH}")
 
@@ -34,6 +35,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --gcc-toolchain=${GCC_PATH}")
 add_link_options(-mcpu=snitch -static -mcmodel=small -fuse-ld=lld)
 add_link_options(-nostartfiles)
 add_link_options(-march=rv32imafdvzfh_xdma -mabi=ilp32d)
+# add_link_options(-march=rv32imafvzfh_xdma -mabi=ilp32)
 add_link_options(-ffast-math -fno-common -fno-builtin-printf)
 
 link_libraries(-lm)

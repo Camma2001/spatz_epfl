@@ -7,49 +7,69 @@
 `include "common_cells/registers.svh"
 
 module snitch_icache_handler #(
-    parameter snitch_icache_pkg::config_t CFG = '0
+    parameter int NR_FETCH_PORTS = 1,
+    parameter int LINE_WIDTH = 1,
+    parameter int LINE_COUNT = 1,
+    parameter int L0_LINE_COUNT = 1,
+    parameter int SET_COUNT = 1,
+    parameter int PENDING_COUNT = 1,
+    parameter int FETCH_AW = 1,
+    parameter int FETCH_DW = 1,
+    parameter int FILL_AW = 1,
+    parameter int FILL_DW = 1,
+    parameter bit EARLY_LATCH = 1,
+    parameter bit BUFFER_LOOKUP = 1,
+    parameter bit GUARANTEE_ORDERING = 1,
+    parameter int FETCH_ALIGN = 1,
+    parameter int FILL_ALIGN = 1,
+    parameter int LINE_ALIGN = 1,
+    parameter int COUNT_ALIGN = 1,
+    parameter int SET_ALIGN = 1,
+    parameter int TAG_WIDTH = 1,
+    parameter int L0_TAG_WIDTH = 1,
+    parameter int L0_EARLY_TAG_WIDTH = 1,
+    parameter int ID_WIDTH_REQ = 1,
+    parameter int ID_WIDTH_RESP = 1,
+    parameter int PENDING_IW = 1
 )(
     input  logic clk_i,
     input  logic rst_ni,
 
-    input  logic [CFG.FETCH_AW-1:0]      in_req_addr_i,
-    input  logic [CFG.ID_WIDTH_REQ-1:0]  in_req_id_i,
-    input  logic [CFG.SET_ALIGN-1:0]     in_req_set_i,
+    input  logic [FETCH_AW-1:0]      in_req_addr_i,
+    input  logic [ID_WIDTH_REQ-1:0]  in_req_id_i,
+    input  logic [SET_ALIGN-1:0]     in_req_set_i,
     input  logic                         in_req_hit_i,
-    input  logic [CFG.LINE_WIDTH-1:0]    in_req_data_i,
+    input  logic [LINE_WIDTH-1:0]    in_req_data_i,
     input  logic                         in_req_error_i,
     input  logic                         in_req_valid_i,
     output logic                         in_req_ready_o,
 
-    output logic [CFG.LINE_WIDTH-1:0]    in_rsp_data_o,
+    output logic [LINE_WIDTH-1:0]    in_rsp_data_o,
     output logic                         in_rsp_error_o,
-    output logic [CFG.ID_WIDTH_RESP-1:0] in_rsp_id_o,
+    output logic [ID_WIDTH_RESP-1:0] in_rsp_id_o,
     output logic                         in_rsp_valid_o,
     input  logic                         in_rsp_ready_i,
 
-    output logic [CFG.COUNT_ALIGN-1:0]   write_addr_o,
-    output logic [CFG.SET_ALIGN-1:0]     write_set_o,
-    output logic [CFG.LINE_WIDTH-1:0]    write_data_o,
-    output logic [CFG.TAG_WIDTH-1:0]     write_tag_o,
+    output logic [COUNT_ALIGN-1:0]   write_addr_o,
+    output logic [SET_ALIGN-1:0]     write_set_o,
+    output logic [LINE_WIDTH-1:0]    write_data_o,
+    output logic [TAG_WIDTH-1:0]     write_tag_o,
     output logic                         write_error_o,
     output logic                         write_valid_o,
     input  logic                         write_ready_i,
 
-    output logic [CFG.FETCH_AW-1:0]      out_req_addr_o,
-    output logic [CFG.PENDING_IW-1:0]    out_req_id_o,
+    output logic [FETCH_AW-1:0]      out_req_addr_o,
+    output logic [PENDING_IW-1:0]    out_req_id_o,
     output logic                         out_req_valid_o,
     input  logic                         out_req_ready_i,
 
-    input  logic [CFG.LINE_WIDTH-1:0]    out_rsp_data_i,
+    input  logic [LINE_WIDTH-1:0]    out_rsp_data_i,
     input  logic                         out_rsp_error_i,
-    input  logic [CFG.PENDING_IW-1:0]    out_rsp_id_i,
+    input  logic [PENDING_IW-1:0]    out_rsp_id_i,
     input  logic                         out_rsp_valid_i,
     output logic                         out_rsp_ready_o
 );
 
-    `ifndef SYNTHESIS
-    initial assert(CFG != '0);
-    `endif
 
     // The table of pending refills holds the metadata of all refills that are
     // currently in flight. The table has a push and a pop interfaces. The push
@@ -58,25 +78,25 @@ module snitch_icache_handler #(
     // from the table and clear its valid flag.
     typedef struct packed {
         logic valid;
-        logic [CFG.FETCH_AW-1:0] addr;
-        logic [CFG.ID_WIDTH_RESP-1:0] idmask; // mask of incoming ids
+        logic [FETCH_AW-1:0] addr;
+        logic [ID_WIDTH_RESP-1:0] idmask; // mask of incoming ids
     } pending_t;
-    pending_t pending_q [CFG.PENDING_COUNT];
-    logic [CFG.PENDING_COUNT-1:0] pending_clr;
-    logic [CFG.PENDING_COUNT-1:0] pending_set;
+    pending_t pending_q [PENDING_COUNT];
+    logic [PENDING_COUNT-1:0] pending_clr;
+    logic [PENDING_COUNT-1:0] pending_set;
 
-    logic [CFG.PENDING_IW-1:0]    push_index;
+    logic [PENDING_IW-1:0]    push_index;
     logic                         push_init;   // reset the idmask instead of or'ing
-    logic [CFG.FETCH_AW-1:0]      push_addr;
-    logic [CFG.ID_WIDTH_RESP-1:0] push_idmask;
+    logic [FETCH_AW-1:0]      push_addr;
+    logic [ID_WIDTH_RESP-1:0] push_idmask;
     logic                         push_enable;
 
-    logic [CFG.PENDING_IW-1:0]    pop_index;
-    logic [CFG.FETCH_AW-1:0]      pop_addr;
-    logic [CFG.ID_WIDTH_RESP-1:0] pop_idmask;
+    logic [PENDING_IW-1:0]    pop_index;
+    logic [FETCH_AW-1:0]      pop_addr;
+    logic [ID_WIDTH_RESP-1:0] pop_idmask;
     logic                         pop_enable;
 
-    for (genvar i = 0; i < CFG.PENDING_COUNT; i++) begin : g_pending_row
+    for (genvar i = 0; i < PENDING_COUNT; i++) begin : g_pending_row
         always_ff @(posedge clk_i, negedge rst_ni) begin
             if (!rst_ni)
                 pending_q[i].valid <= 0;
@@ -110,17 +130,17 @@ module snitch_icache_handler #(
     end
 
     // Determine the first available entry in the pending table, if any is free.
-    logic [CFG.PENDING_COUNT-1:0] free_entries;
+    logic [PENDING_COUNT-1:0] free_entries;
     logic free;
-    logic [CFG.PENDING_IW-1:0] free_id;
+    logic [PENDING_IW-1:0] free_id;
 
     always_comb begin : p_free_id
-        for (int i = 0; i < CFG.PENDING_COUNT; i++)
+        for (int i = 0; i < PENDING_COUNT; i++)
             free_entries[i] = ~pending_q[i].valid;
         free = |free_entries;
     end
 
-    lzc #(.WIDTH(CFG.PENDING_COUNT)) i_lzc_free (
+    lzc #(.WIDTH(PENDING_COUNT)) i_lzc_free (
         .in_i    ( free_entries ),
         .cnt_o   ( free_id      ),
         .empty_o (              )
@@ -128,17 +148,17 @@ module snitch_icache_handler #(
 
     // Determine if the address of the incoming request coincides with any of
     // the entries in the pending table.
-    logic [CFG.PENDING_COUNT-1:0] pending_matches;
+    logic [PENDING_COUNT-1:0] pending_matches;
     logic pending;
-    logic [CFG.PENDING_IW-1:0] pending_id;
+    logic [PENDING_IW-1:0] pending_id;
 
     always_comb begin : p_pending_id
-        for (int i = 0; i < CFG.PENDING_COUNT; i++)
+        for (int i = 0; i < PENDING_COUNT; i++)
             pending_matches[i] = pending_q[i].valid && pending_q[i].addr == in_req_addr_i;
         pending = |pending_matches;
     end
 
-    lzc #(.WIDTH(CFG.PENDING_COUNT)) i_lzc_pending (
+    lzc #(.WIDTH(PENDING_COUNT)) i_lzc_pending (
         .in_i    ( pending_matches ),
         .cnt_o   ( pending_id      ),
         .empty_o (                 )
@@ -147,9 +167,9 @@ module snitch_icache_handler #(
     // Gurarntee ordering
     // Check if there is a miss in flight from this ID. In that case, stall all
     // further requests to guarantee correct ordering of requests.
-    logic [CFG.ID_WIDTH_RESP-1:0] miss_in_flight_d, miss_in_flight_q;
+    logic [ID_WIDTH_RESP-1:0] miss_in_flight_d, miss_in_flight_q;
 
-    if (CFG.GUARANTEE_ORDERING) begin : g_miss_in_flight_table
+    if (GUARANTEE_ORDERING) begin : g_miss_in_flight_table
       always_comb begin : p_miss_in_flight
           miss_in_flight_d = miss_in_flight_q;
           if (push_enable) begin
@@ -172,8 +192,8 @@ module snitch_icache_handler #(
     // progress which cover the request. If not, a new refill request is issued
     // and the next free entry in the table allocated. Otherwise the existing
     // table entry is updated.
-    logic [CFG.ID_WIDTH_RESP-1:0] hit_id;
-    logic [CFG.LINE_WIDTH-1:0]    hit_data;
+    logic [ID_WIDTH_RESP-1:0] hit_id;
+    logic [LINE_WIDTH-1:0]    hit_data;
     logic                         hit_error;
     logic                         hit_valid;
     logic                         hit_ready;
@@ -234,10 +254,10 @@ module snitch_icache_handler #(
     // replacement at random. Note that we assume that the entire cache is full,
     // so no empty cache lines are available. This is the common case since we
     // do not support flushing of the cache.
-    logic [CFG.SET_ALIGN-1:0] evict_index;
+    logic [SET_ALIGN-1:0] evict_index;
     logic evict_enable;
 
-    snitch_icache_lfsr #(CFG.SET_ALIGN) i_evict_lfsr (
+    snitch_icache_lfsr #(SET_ALIGN) i_evict_lfsr (
         .clk_i    ( clk_i        ),
         .rst_ni   ( rst_ni       ),
         .value_o  ( evict_index  ),
@@ -270,10 +290,10 @@ module snitch_icache_handler #(
         pop_index  = out_rsp_id_i;
         pop_enable = 0;
 
-        write_addr_o  = pop_addr >> CFG.LINE_ALIGN;
+        write_addr_o  = pop_addr >> LINE_ALIGN;
         write_set_o   = evict_index;
         write_data_o  = out_rsp_data_i;
-        write_tag_o   = pop_addr >> (CFG.LINE_ALIGN + CFG.COUNT_ALIGN);
+        write_tag_o   = pop_addr >> (LINE_ALIGN + COUNT_ALIGN);
         write_error_o = out_rsp_error_i;
         write_valid_o = 0;
 

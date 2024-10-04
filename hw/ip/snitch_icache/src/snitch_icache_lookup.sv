@@ -6,7 +6,30 @@
 
 /// An actual cache lookup.
 module snitch_icache_lookup #(
-    parameter snitch_icache_pkg::config_t CFG = '0,
+    parameter int NR_FETCH_PORTS = 1,
+    parameter int LINE_WIDTH = 1,
+    parameter int LINE_COUNT = 1,
+    parameter int L0_LINE_COUNT = 1,
+    parameter int SET_COUNT = 1,
+    parameter int PENDING_COUNT = 1,
+    parameter int FETCH_AW = 1,
+    parameter int FETCH_DW = 1,
+    parameter int FILL_AW = 1,
+    parameter int FILL_DW = 1,
+    parameter bit EARLY_LATCH = 1,
+    parameter bit BUFFER_LOOKUP = 1,
+    parameter bit GUARANTEE_ORDERING = 1,
+    parameter int FETCH_ALIGN = 1,
+    parameter int FILL_ALIGN = 1,
+    parameter int LINE_ALIGN = 1,
+    parameter int COUNT_ALIGN = 1,
+    parameter int SET_ALIGN = 1,
+    parameter int TAG_WIDTH = 1,
+    parameter int L0_TAG_WIDTH = 1,
+    parameter int L0_EARLY_TAG_WIDTH = 1,
+    parameter int ID_WIDTH_REQ = 1,
+    parameter int ID_WIDTH_RESP = 1,
+    parameter int PENDING_IW = 1,
     /// Configuration input types for SRAMs used in implementation.
     parameter type sram_cfg_data_t  = logic,
     parameter type sram_cfg_tag_t   = logic
@@ -17,24 +40,24 @@ module snitch_icache_lookup #(
     input  logic flush_valid_i,
     output logic flush_ready_o,
 
-    input  logic [CFG.FETCH_AW-1:0]     in_addr_i,
-    input  logic [CFG.ID_WIDTH_REQ-1:0] in_id_i,
+    input  logic [FETCH_AW-1:0]     in_addr_i,
+    input  logic [ID_WIDTH_REQ-1:0] in_id_i,
     input  logic                        in_valid_i,
     output logic                        in_ready_o,
 
-    output logic [CFG.FETCH_AW-1:0]     out_addr_o,
-    output logic [CFG.ID_WIDTH_REQ-1:0] out_id_o,
-    output logic [CFG.SET_ALIGN-1:0]    out_set_o,
+    output logic [FETCH_AW-1:0]     out_addr_o,
+    output logic [ID_WIDTH_REQ-1:0] out_id_o,
+    output logic [SET_ALIGN-1:0]    out_set_o,
     output logic                        out_hit_o,
-    output logic [CFG.LINE_WIDTH-1:0]   out_data_o,
+    output logic [LINE_WIDTH-1:0]   out_data_o,
     output logic                        out_error_o,
     output logic                        out_valid_o,
     input  logic                        out_ready_i,
 
-    input  logic [CFG.COUNT_ALIGN-1:0]  write_addr_i,
-    input  logic [CFG.SET_ALIGN-1:0]    write_set_i,
-    input  logic [CFG.LINE_WIDTH-1:0]   write_data_i,
-    input  logic [CFG.TAG_WIDTH-1:0]    write_tag_i,
+    input  logic [COUNT_ALIGN-1:0]  write_addr_i,
+    input  logic [SET_ALIGN-1:0]    write_set_i,
+    input  logic [LINE_WIDTH-1:0]   write_data_i,
+    input  logic [TAG_WIDTH-1:0]    write_tag_i,
     input  logic                        write_error_i,
     input  logic                        write_valid_i,
     output logic                        write_ready_o,
@@ -43,24 +66,22 @@ module snitch_icache_lookup #(
     input  sram_cfg_tag_t   sram_cfg_tag_i
 );
 
-    `ifndef SYNTHESIS
-    initial assert(CFG != '0);
-    `endif
+
 
     // Multiplex read and write access to the RAMs onto one port, prioritizing
     // write accesses.
-    logic [CFG.COUNT_ALIGN-1:0] ram_addr                             ;
-    logic [CFG.SET_COUNT-1:0]   ram_enable                           ;
-    logic [CFG.LINE_WIDTH-1:0]  ram_wdata, ram_rdata [CFG.SET_COUNT] ;
-    logic [CFG.TAG_WIDTH+1:0]   ram_wtag,  ram_rtag  [CFG.SET_COUNT] ;
+    logic [COUNT_ALIGN-1:0] ram_addr                             ;
+    logic [SET_COUNT-1:0]   ram_enable                           ;
+    logic [LINE_WIDTH-1:0]  ram_wdata, ram_rdata [SET_COUNT] ;
+    logic [TAG_WIDTH+1:0]   ram_wtag,  ram_rtag  [SET_COUNT] ;
     logic                       ram_write                            ;
     logic                       ram_write_q;
-    logic [CFG.COUNT_ALIGN:0]   init_count_q;
+    logic [COUNT_ALIGN:0]   init_count_q;
 
     typedef struct packed {
-      logic [CFG.SET_ALIGN-1:0]   cset;
+      logic [SET_ALIGN-1:0]   cset;
       logic                       hit;
-      logic [CFG.LINE_WIDTH-1:0]  data;
+      logic [LINE_WIDTH-1:0]  data;
       logic                       error;
     } out_buffer_t;
 
@@ -72,13 +93,13 @@ module snitch_icache_lookup #(
         write_ready_o = 0;
         in_ready_o = 0;
 
-        ram_addr   = in_addr_i >> CFG.LINE_ALIGN;
+        ram_addr   = in_addr_i >> LINE_ALIGN;
         ram_wdata  = write_data_i;
         ram_wtag   = {1'b1, write_error_i, write_tag_i};
         ram_enable = '0;
         ram_write  = 1'b0;
 
-        if (init_count_q != $unsigned(CFG.LINE_COUNT)) begin
+        if (init_count_q != $unsigned(LINE_COUNT)) begin
             ram_addr   = init_count_q;
             ram_enable = '1;
             ram_write  = 1'b1;
@@ -86,7 +107,7 @@ module snitch_icache_lookup #(
             ram_wtag   = '0;
         end else  if (write_valid_i) begin
             ram_addr   = write_addr_i;
-            ram_enable = CFG.SET_COUNT > 1 ? $unsigned(1 << write_set_i) : 1'b1;
+            ram_enable = SET_COUNT > 1 ? $unsigned(1 << write_set_i) : 1'b1;
             ram_write  = 1'b1;
             write_ready_o = 1'b1;
         end else if (out_ready_i) begin
@@ -101,7 +122,7 @@ module snitch_icache_lookup #(
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if (!rst_ni)
             init_count_q <= '0;
-        else if (init_count_q != $unsigned(CFG.LINE_COUNT))
+        else if (init_count_q != $unsigned(LINE_COUNT))
             init_count_q <= init_count_q + 1;
         else if (flush_valid_i)
             init_count_q <= '0;
@@ -118,14 +139,14 @@ module snitch_icache_lookup #(
     // The address register keeps track of additional metadata alongside the
     // looked up tag and data.
     logic valid_q;
-    logic [CFG.FETCH_AW-1:0] addr_q;
-    logic [CFG.ID_WIDTH_REQ-1:0] id_q;
+    logic [FETCH_AW-1:0] addr_q;
+    logic [ID_WIDTH_REQ-1:0] id_q;
 
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             valid_q <= 0;
         end else begin
-            if (CFG.BUFFER_LOOKUP) begin
+            if (BUFFER_LOOKUP) begin
                 valid_q <= in_valid_i && in_ready_o;
             end else if ((in_valid_i && in_ready_o) || out_ready_i) begin
                 valid_q <= in_valid_i && in_ready_o;
@@ -144,10 +165,10 @@ module snitch_icache_lookup #(
     end
 
     // Instantiate the RAM sets.
-    for (genvar i = 0; i < CFG.SET_COUNT; i++) begin : g_sets
+    for (genvar i = 0; i < SET_COUNT; i++) begin : g_sets
         tc_sram_impl #(
-          .NumWords (CFG.LINE_COUNT),
-          .DataWidth (CFG.TAG_WIDTH+2),
+          .NumWords (LINE_COUNT),
+          .DataWidth (TAG_WIDTH+2),
           .ByteWidth (8),
           .NumPorts (1),
           .Latency (1),
@@ -166,8 +187,8 @@ module snitch_icache_lookup #(
         );
 
         tc_sram_impl #(
-          .NumWords (CFG.LINE_COUNT),
-          .DataWidth (CFG.LINE_WIDTH),
+          .NumWords (LINE_COUNT),
+          .DataWidth (LINE_WIDTH),
           .ByteWidth (8),
           .NumPorts (1),
           .Latency (1),
@@ -187,38 +208,38 @@ module snitch_icache_lookup #(
     end
 
     // Determine which RAM line hit, and multiplex that data to the output.
-    logic [CFG.TAG_WIDTH-1:0] required_tag;
-    logic [CFG.SET_COUNT-1:0] line_hit;
+    logic [TAG_WIDTH-1:0] required_tag;
+    logic [SET_COUNT-1:0] line_hit;
 
     always_comb begin
-        automatic logic [CFG.SET_COUNT-1:0] errors;
-        required_tag = addr_q >> (CFG.LINE_ALIGN + CFG.COUNT_ALIGN);
-        for (int i = 0; i < CFG.SET_COUNT; i++) begin
-            line_hit[i] = ram_rtag[i][CFG.TAG_WIDTH+1] &&
-              ram_rtag[i][CFG.TAG_WIDTH-1:0] == required_tag;
-            errors[i] = ram_rtag[i][CFG.TAG_WIDTH] && line_hit[i];
+        automatic logic [SET_COUNT-1:0] errors;
+        required_tag = addr_q >> (LINE_ALIGN + COUNT_ALIGN);
+        for (int i = 0; i < SET_COUNT; i++) begin
+            line_hit[i] = ram_rtag[i][TAG_WIDTH+1] &&
+              ram_rtag[i][TAG_WIDTH-1:0] == required_tag;
+            errors[i] = ram_rtag[i][TAG_WIDTH] && line_hit[i];
         end
         data_d.hit = |line_hit & ~ram_write_q; // Don't let refills trigger "valid" lookups
         data_d.error = |errors;
     end
 
     always_comb begin
-        for (int i = 0; i < CFG.LINE_WIDTH; i++) begin
-            automatic logic [CFG.SET_COUNT-1:0] masked;
-            for (int j = 0; j < CFG.SET_COUNT; j++)
+        for (int i = 0; i < LINE_WIDTH; i++) begin
+            automatic logic [SET_COUNT-1:0] masked;
+            for (int j = 0; j < SET_COUNT; j++)
                 masked[j] = ram_rdata[j][i] & line_hit[j];
             data_d.data[i] = |masked;
         end
     end
 
-    lzc #(.WIDTH(CFG.SET_COUNT)) i_lzc (
+    lzc #(.WIDTH(SET_COUNT)) i_lzc (
         .in_i     ( line_hit    ),
         .cnt_o    ( data_d.cset ),
         .empty_o  (             )
     );
 
     // Buffer response in case we are stalled
-    if (CFG.BUFFER_LOOKUP) begin : gen_buffer
+    if (BUFFER_LOOKUP) begin : gen_buffer
       fall_through_register #(
           .T          ( out_buffer_t )
       ) i_rsp_buffer (
