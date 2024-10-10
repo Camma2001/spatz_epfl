@@ -23,7 +23,7 @@ package spatz_pkg;
   // Single-precision floating point support
   localparam bit RVF            = 1;
   // Double-precision floating-point support
-  localparam bit RVD            = 1;
+  localparam bit RVD            = 0;
   // Vector support
   localparam bit RVV            = 1;
 
@@ -32,7 +32,7 @@ package spatz_pkg;
   // Maximum size of a single vector element in bytes
   localparam int unsigned ELENB  = ELEN / 8;
   // Number of bits in a vector register
-  localparam int unsigned VLEN   = 512;
+  localparam int unsigned VLEN   = 128;
   // Number of bytes in a vector register
   localparam int unsigned VLENB  = VLEN / 8;
   // Maximum vector length in elements
@@ -43,7 +43,7 @@ package spatz_pkg;
   // Spatz' data width
   localparam int unsigned DataWidth = ELEN;
   // Spatz' strobe width
-  localparam int unsigned StrbWidth = ELENB;
+  // localparam int unsigned StrbWidth = ELENB;
 
   // Width of a VRF word
   localparam int unsigned VRFWordWidth     = N_FU * ELEN;
@@ -339,9 +339,7 @@ package spatz_pkg;
     Width        : ELEN,
     EnableVectors: 1'b1,
     EnableNanBox : 1'b1,
-    //              FP32  FP64  FP16  FP8   FP16a FP8a
     FpFmtMask    : {1'b1, 1'b1, 1'b1, 1'b1, 1'b1, 1'b1},
-    //              INT8  INT16 INT32 INT64
     IntFmtMask   : {1'b1, 1'b1, 1'b1, 1'b1}
   } :
   // Single Precision FPU

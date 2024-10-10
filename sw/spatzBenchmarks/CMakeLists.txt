@@ -74,43 +74,43 @@ add_library(sp-fft sp-fft/kernel/fft.c)
 enable_testing()
 set(SNITCH_TEST_PREFIX spatzBenchmarks-)
 
-#  add_spatz_test_threeParam(dp-fmatmul dp-fmatmul/main.c 64  64  64 )
+#  add_spatz_test_threeParam(dp-fmatmul dp-fmatmul/main.c 64  64  64 ) # DO NOT SUPPORT D EXTENSION
 
-add_spatz_test_threeParam(sp-fmatmul sp-fmatmul/main.c 64  64  64 )
-#  add_spatz_test_threeParam(sp-fmatmul sp-fmatmul/main.c 64  128 64 )
+ add_spatz_test_threeParam(sp-fmatmul sp-fmatmul/main.c 64  64  64 ) ## PASSED
+ add_spatz_test_threeParam(sp-fmatmul sp-fmatmul/main.c 64  128 64 ) ## PASSED
 
-#  add_spatz_test_threeParam(hp-fmatmul hp-fmatmul/main.c 64  64  64 )
-#  add_spatz_test_threeParam(hp-fmatmul hp-fmatmul/main.c 64  128 64 )
-#  add_spatz_test_threeParam(hp-fmatmul hp-fmatmul/main.c 128 128 128)
+ add_spatz_test_threeParam(hp-fmatmul hp-fmatmul/main.c 64  64  64 ) ## PASSED
+ add_spatz_test_threeParam(hp-fmatmul hp-fmatmul/main.c 64  128 64 ) ## PASSED
+ add_spatz_test_threeParam(hp-fmatmul hp-fmatmul/main.c 128 128 128) ## PASSED
 
-#  add_spatz_test_threeParam(widening-hp-fmatmul widening-hp-fmatmul/main.c 64  64  64 )
-#  add_spatz_test_threeParam(widening-hp-fmatmul widening-hp-fmatmul/main.c 64  128 64 )
-#  add_spatz_test_threeParam(widening-hp-fmatmul widening-hp-fmatmul/main.c 128 128 128)
+ add_spatz_test_threeParam(widening-hp-fmatmul widening-hp-fmatmul/main.c 64  64  64 ) ## PASSED
+ add_spatz_test_threeParam(widening-hp-fmatmul widening-hp-fmatmul/main.c 64  128 64 ) ## PASSED
+ add_spatz_test_threeParam(widening-hp-fmatmul widening-hp-fmatmul/main.c 128 128 128) ## PASSED
 
-#  add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 64  64  64 )
-#  add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 64  128 64 )
-#  add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 128 128 128)
-#  add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 128 256 128)
+ add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 64  64  64 ) ## PASSED
+ add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 64  128 64 ) ## PASSED
+ add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 128 128 128) ## PASSED
+ add_spatz_test_threeParam(widening-bp-fmatmul widening-bp-fmatmul/main.c 128 256 128) ## PASSED
 
-#  add_spatz_test_threeParam(sdotp-hp-fmatmul sdotp-hp-fmatmul/main.c 64  64  64 )
-#  add_spatz_test_threeParam(sdotp-hp-fmatmul sdotp-hp-fmatmul/main.c 64  128 64 )
-#  add_spatz_test_threeParam(sdotp-hp-fmatmul sdotp-hp-fmatmul/main.c 128 128 128)
+ add_spatz_test_threeParam(sdotp-hp-fmatmul sdotp-hp-fmatmul/main.c 64  64  64 ) ## PASSED
+ add_spatz_test_threeParam(sdotp-hp-fmatmul sdotp-hp-fmatmul/main.c 64  128 64 ) ## PASSED
+ add_spatz_test_threeParam(sdotp-hp-fmatmul sdotp-hp-fmatmul/main.c 128 128 128) ## PASSED
 
-#  add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 64  64  64 )
-#  add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 64  128 64 )
-#  add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 128 128 128)
-#  add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 128 256 128)
+ add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 64  64  64 ) ## PASSED
+ add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 64  128 64 ) ## PASSED
+ add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 128 128 128) ## PASSED
+ add_spatz_test_threeParam(sdotp-bp-fmatmul sdotp-bp-fmatmul/main.c 128 256 128) ## PASSED
 
-#  add_spatz_test_oneParam(dp-faxpy dp-faxpy/main.c 256)
-#  add_spatz_test_oneParam(dp-faxpy dp-faxpy/main.c 1024)
+#  add_spatz_test_oneParam(dp-faxpy dp-faxpy/main.c 256) # DO NOT SUPPORT D EXTENSION
+#  add_spatz_test_oneParam(dp-faxpy dp-faxpy/main.c 1024) # DO NOT SUPPORT D EXTENSION
 
-#  add_spatz_test_oneParam(dp-fdotp dp-fdotp/main.c 128)
-#  add_spatz_test_oneParam(dp-fdotp dp-fdotp/main.c 4096)
+#  add_spatz_test_oneParam(dp-fdotp dp-fdotp/main.c 128) # DO NOT SUPPORT D EXTENSION
+#  add_spatz_test_oneParam(dp-fdotp dp-fdotp/main.c 4096) # DO NOT SUPPORT D EXTENSION
 
-#  add_spatz_test_threeParam(dp-fconv2d dp-fconv2d/main.c 32 32 7)
-#  add_spatz_test_threeParam(dp-fconv2d dp-fconv2d/main.c 64 64 7)
+#  add_spatz_test_threeParam(dp-fconv2d dp-fconv2d/main.c 32 32 7) # DO NOT SUPPORT D EXTENSION
+#  add_spatz_test_threeParam(dp-fconv2d dp-fconv2d/main.c 64 64 7) # DO NOT SUPPORT D EXTENSION
 
-#  add_spatz_test_twoParam(dp-fft dp-fft/main.c 128 2)
+#  add_spatz_test_twoParam(dp-fft dp-fft/main.c 128 2) # DO NOT SUPPORT D EXTENSION
 
-#  add_spatz_test_twoParam(sp-fft sp-fft/main.c 256 2)
-#  add_spatz_test_twoParam(sp-fft sp-fft/main.c 512 2)
+#  add_spatz_test_twoParam(sp-fft sp-fft/main.c 256 2) # DO NOT WORK -> INSTRUCTIONS FROM D EXTENSION, NEED TO CHANGE LIBRARY WHEN LINKING
+#  add_spatz_test_twoParam(sp-fft sp-fft/main.c 512 2) # DO NOT WORK -> INSTRUCTIONS FROM D EXTENSION, NEED TO CHANGE LIBRARY WHEN LINKING

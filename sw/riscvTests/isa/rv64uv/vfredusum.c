@@ -38,7 +38,6 @@ void TEST_CASE1(void) {
   VLOAD_64(v24, 0x3FF0000000000000);
   asm volatile("vfredusum.vs v8, v16, v24");
   VCMP_F64(3, v8, 0x4052400000000000);
-#endif
 
   // Super long vector length
   VSET(64, e32, m8);
@@ -57,6 +56,7 @@ void TEST_CASE1(void) {
   VLOAD_32(v24, 0x3F800000);
   asm volatile("vfredusum.vs v8, v16, v24");
   VCMP_F32(4, v8, 0x43908000);
+#endif
 }
 
 // Masked naive test
